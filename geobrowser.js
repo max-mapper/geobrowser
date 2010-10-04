@@ -1,18 +1,6 @@
 var GeoJSONHelper = function() {
   return {
     // map borrowed from http://github.com/janl/mustache.js/blob/master/mustache.js
-    map : function(array, fn) {
-      if (typeof array.map == "function") {
-        return array.map(fn);
-      } else {
-        var r = [];
-        var l = array.length;
-        for(var i = 0; i < l; i++) {
-          r.push(fn(array[i]));
-        }
-        return r;
-      }
-    },
     collect_geometries : function(geometries) {
       if (geometries.type == 'GeometryCollection')
         return geometries;
@@ -24,7 +12,7 @@ var GeoJSONHelper = function() {
       return { "type" : "FeatureCollection", "features" : features }
     },
     pdxapi_feature_collection : function(data) {
-      var features = GeoJSONHelper.map(data.rows, function(row){
+      var features = $.map(data.rows, function(row, idx){
         return {
           geometry: row.value.geometry,
           type: 'Feature',
@@ -52,9 +40,6 @@ var Map = function() {
           "bbox": Map.container.getExtent().transform( proj900913, proj4326 ).toBBOX()
         },
         success: function(data){
-          //var geometries = GeoJSONHelper.map(data.rows, function(row){
-          //  return row.value.geometry
-          //});
           Indicator.hide();
           var feature_collection = GeoJSONHelper.pdxapi_feature_collection(data);
           Map.drawFeature(Map.geojson_format.read(feature_collection));
@@ -62,9 +47,9 @@ var Map = function() {
       })
     },
     drawFeature: function(feature) {
-      for (var i = 0; i < feature.length; i++) {
-        feature[i].geometry.transform(proj4326, proj900913);
-      }
+      $.each(feature, function(idx, item) {
+        item.geometry.transform(proj4326, proj900913);
+      });
       Map.vector_layer.destroyFeatures();
       Map.vector_layer.addFeatures(feature);
     }
@@ -131,9 +116,12 @@ $(function() {
       strokeWidth: 3,
       pointRadius: 10
     }),
-    /*'select': new OpenLayers.Style({
-      pointRadius: 20
-    })*/
+    'select': new OpenLayers.Style({
+      strokeColor: "yellow",
+    }),
+    'temporary': new OpenLayers.Style({
+      strokeColor: "blue",
+    }),
   });
 
   Map.vector_layer = new OpenLayers.Layer.Vector("GeoJSON", {
@@ -142,27 +130,25 @@ $(function() {
   });
   Map.container.addLayer(Map.vector_layer);
 
-  var report = function(e) {
-      console.log(e.type + ": " + e.feature.id);
-  };
+  function onFeatureSelect(feature) {
+      selectedFeature = feature;
+      $('#metadata').html(
+        "<h1>"+feature.attributes.id+'</h1>'
+      );
+  }
+  function onFeatureUnselect(feature) {
+      $('#metadata').html('');
+  }    
 
   var highlightCtrl = new OpenLayers.Control.SelectFeature(Map.vector_layer, {
       hover: true,
       highlightOnly: true,
       renderIntent: "temporary",
-      eventListeners: {
-          beforefeaturehighlighted: report,
-          featurehighlighted: report,
-          featureunhighlighted: report
-      }
   });
 
   var selectCtrl = new OpenLayers.Control.SelectFeature(Map.vector_layer, {
-      eventListeners: {
-          featurehighlighted: report,
-          featureunhighlighted: report
-      },
-      clickout: true
+      onSelect: onFeatureSelect,
+      onUnselect: onFeatureUnselect, 
   });
 
   Map.container.addControl(highlightCtrl);
@@ -185,6 +171,9 @@ $(function() {
     var dataset = $(this).text();
     $('.selected').removeClass('selected');
     $(this).addClass('selected');
+    $("#metadata").html(
+      '<h1>'+dataset+'</h1>'
+    );
     Map.currentDataset = dataset;
     Map.fetchFeatures();
   });
