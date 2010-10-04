@@ -21,13 +21,19 @@ var GeoJSONHelper = function() {
     collect_features : function(features){
       if (features.type == 'FeatureCollection')
         return features;
-      return { "type" : "FeatureCollection", "features" : GeoJSONHelper.map(features, function(feature){return {"geometry" : feature};})}
+      return { "type" : "FeatureCollection", "features" : features }
     },
-    feature_collection_for : function(geojson) {
-      var feature = this.collect_features(this.collect_geometries(geojson));
-      return feature;
+    pdxapi_feature_collection : function(data) {
+      var features = GeoJSONHelper.map(data.rows, function(row){
+        return {
+          geometry: row.value.geometry,
+          type: 'Feature',
+          properties: {id: row.id}
+        };
+      });
+      return GeoJSONHelper.collect_features(features);
     }
-  };
+  }
 }();
 
 var Map = function() {
@@ -46,16 +52,19 @@ var Map = function() {
           "bbox": Map.container.getExtent().transform( proj900913, proj4326 ).toBBOX()
         },
         success: function(data){
-          var geometries = GeoJSONHelper.map(data.rows, function(row){
-            return row.value.geometry
-          });
+          //var geometries = GeoJSONHelper.map(data.rows, function(row){
+          //  return row.value.geometry
+          //});
           Indicator.hide();
-          Map.drawFeature(Map.geojson_format.read(GeoJSONHelper.feature_collection_for(geometries)));
+          var feature_collection = GeoJSONHelper.pdxapi_feature_collection(data);
+          Map.drawFeature(Map.geojson_format.read(feature_collection));
         }
       })
     },
     drawFeature: function(feature) {
-      feature[0].geometry.transform(proj4326, proj900913);
+      for (var i = 0; i < feature.length; i++) {
+        feature[i].geometry.transform(proj4326, proj900913);
+      }
       Map.vector_layer.destroyFeatures();
       Map.vector_layer.addFeatures(feature);
     }
