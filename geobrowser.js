@@ -106,25 +106,63 @@ $(function() {
     displayProjection: proj4326,
     tileSize: new OpenLayers.Size(256, 256),
     controls: [
-    new OpenLayers.Control.Navigation(),
-    new OpenLayers.Control.PanZoomBar(),
-    new OpenLayers.Control.KeyboardDefaults()
-      ]
+      new OpenLayers.Control.Navigation(),
+      new OpenLayers.Control.PanZoomBar(),
+      new OpenLayers.Control.KeyboardDefaults()
+    ]
   };
   Map.container = new OpenLayers.Map('map', Map.options);
   Map.gmap = new OpenLayers.Layer.Google("Google Streets", {"sphericalMercator": true ,numZoomLevels: 20}); 
   Map.container.addLayer(Map.gmap);
-  Map.styleMap = new OpenLayers.StyleMap(OpenLayers.Util.applyDefaults(
-    {fillOpacity: 0.2, strokeColor: "black", strokeWidth: 3},
-    OpenLayers.Feature.Vector.style["default"]));
+
+  Map.styleMap = new OpenLayers.StyleMap({
+    'default': OpenLayers.Util.applyDefaults({
+      fillOpacity: 0.2, 
+      strokeColor: "black", 
+      strokeWidth: 3,
+      pointRadius: 10
+    }),
+    /*'select': new OpenLayers.Style({
+      pointRadius: 20
+    })*/
+  });
 
   Map.vector_layer = new OpenLayers.Layer.Vector("GeoJSON", {
     projection: proj4326, 
     styleMap: Map.styleMap
   });
+  Map.container.addLayer(Map.vector_layer);
+
+  var report = function(e) {
+      console.log(e.type + ": " + e.feature.id);
+  };
+
+  var highlightCtrl = new OpenLayers.Control.SelectFeature(Map.vector_layer, {
+      hover: true,
+      highlightOnly: true,
+      renderIntent: "temporary",
+      eventListeners: {
+          beforefeaturehighlighted: report,
+          featurehighlighted: report,
+          featureunhighlighted: report
+      }
+  });
+
+  var selectCtrl = new OpenLayers.Control.SelectFeature(Map.vector_layer, {
+      eventListeners: {
+          featurehighlighted: report,
+          featureunhighlighted: report
+      },
+      clickout: true
+  });
+
+  Map.container.addControl(highlightCtrl);
+  Map.container.addControl(selectCtrl);
+
+  highlightCtrl.activate();
+  selectCtrl.activate();
 
   Map.geojson_format = new OpenLayers.Format.GeoJSON();     
-  Map.container.addLayer(Map.vector_layer);
 
   Map.container.setCenter(new OpenLayers.LonLat(-122.6762071,45.5234515), Map.zoom);
   Map.container.events.register( 'moveend', this, function(){ Map.fetchFeatures() });

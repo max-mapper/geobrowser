@@ -1,3 +1,5 @@
 h1. GeoBrowser
 
 p. Visualize geometries using opensearch compatible (?bbox=) geojson APIs using OpenLayers!
+
+

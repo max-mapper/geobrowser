@@ -4,7 +4,7 @@
 #list li { padding:10px; }
 #list li:hover { background:#555; color:#fff; cursor:pointer; cursor:hand; }
 #OpenLayers.Control.PanZoom_5_zoomworld {display:none;}
-#menu {width: 25%; height: 100%; float: right; overflow: auto;}
+#sidebar {width: 25%; height: 100%; float: right; overflow: auto;}
 #databases { list-style-type: none;}
 #databases li:hover { font-weight: bold; cursor: pointer; cursor: hand;}
 #loader {
