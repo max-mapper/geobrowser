@@ -46,6 +46,45 @@ var Map = function() {
         }
       })
     },
+    formatMetadata: function(data) {
+      out = '<dl>';
+      $.each(data, function(key, val) {
+        if (typeof(val) == 'string' && key[0] != '_') {
+          out = out + '<dt>' + key + '<dd>' + val;
+        }
+      });
+      out = out + '</dl>';
+      return out;
+    },
+    fetchFeatureMetadata: function(feature) {
+      Map.clearMetadata(feature);
+      $.ajax({
+        url: Map.couchUrl + Map.currentDataset + "/" + feature.attributes.id,
+        dataType: 'jsonp',
+        success: function(data) {
+          // TODO: Format using formatting func
+          $('#metadata').html("<h1>Feature Metadata</h1>"+
+            Map.formatMetadata(data));
+        }
+      });
+    },
+    clearMetadata: function(arg) {
+      $('#metadata').html('');
+    },
+    fetchDatasetMetadata: function(dataset) {
+      Map.clearMetadata(dataset);
+      $.ajax({
+        // TODO: Dataset metadata?
+        url: Map.couchUrl + Map.currentDataset,
+        dataType: 'jsonp',
+        success: function(data){
+          $('#metadata').html("<h1>Dataset Metadata</h1>"+
+            Map.formatMetadata(data)
+          );
+        }
+      });
+    },
+
     drawFeature: function(feature) {
       $.each(feature, function(idx, item) {
         item.geometry.transform(proj4326, proj900913);
@@ -130,16 +169,6 @@ $(function() {
   });
   Map.container.addLayer(Map.vector_layer);
 
-  function onFeatureSelect(feature) {
-      selectedFeature = feature;
-      $('#metadata').html(
-        "<h1>"+feature.attributes.id+'</h1>'
-      );
-  }
-  function onFeatureUnselect(feature) {
-      $('#metadata').html('');
-  }    
-
   var highlightCtrl = new OpenLayers.Control.SelectFeature(Map.vector_layer, {
       hover: true,
       highlightOnly: true,
@@ -147,8 +176,8 @@ $(function() {
   });
 
   var selectCtrl = new OpenLayers.Control.SelectFeature(Map.vector_layer, {
-      onSelect: onFeatureSelect,
-      onUnselect: onFeatureUnselect, 
+      onSelect: Map.fetchFeatureMetadata,
+      onUnselect: Map.clearMetadata, 
   });
 
   Map.container.addControl(highlightCtrl);
@@ -171,9 +200,7 @@ $(function() {
     var dataset = $(this).text();
     $('.selected').removeClass('selected');
     $(this).addClass('selected');
-    $("#metadata").html(
-      '<h1>'+dataset+'</h1>'
-    );
+    Map.fetchDatasetMetadata(dataset);
     Map.currentDataset = dataset;
     Map.fetchFeatures();
   });
