@@ -26,6 +26,7 @@ var GeoJSONHelper = function() {
 
 var Map = function() {
   return {
+    geocoder: new GClientGeocoder(),
     couchUrl: "http://maxogden.couchone.com/",
     currentDataset: "",
     lon: -122.442429131298411,
@@ -63,7 +64,7 @@ var Map = function() {
         dataType: 'jsonp',
         success: function(data) {
           // TODO: Format using formatting func
-          $('#metadata').html("<h1>Feature Metadata</h1>"+
+          $('#metadata').html("<h3>Feature Metadata</h3>"+
             Map.formatMetadata(data));
         }
       });
@@ -78,19 +79,19 @@ var Map = function() {
         url: Map.couchUrl + Map.currentDataset,
         dataType: 'jsonp',
         success: function(data){
-          $('#metadata').html("<h1>Dataset Metadata</h1>"+
+          $('#metadata').html("<h3>Dataset Metadata</h3>"+
             Map.formatMetadata(data)
           );
         }
       });
     },
 
-    drawFeature: function(feature) {
-      $.each(feature, function(idx, item) {
+    drawFeature: function(features) {
+      $.each(features, function(idx, item) {
         item.geometry.transform(proj4326, proj900913);
       });
       Map.vector_layer.destroyFeatures();
-      Map.vector_layer.addFeatures(feature);
+      Map.vector_layer.addFeatures(features);
     }
   }
 }();
@@ -109,6 +110,19 @@ var Indicator = {
 var showing_layers = [];
 
 $(function() {
+  $('.geocoder_form').submit(function(){
+    Map.geocoder.getLatLng(this.address.value + " portland, oregon", function(point) {
+      if (!point) {
+        alert(address + " not found");
+      } else {
+        var newCenter = new OpenLayers.LonLat(point.x, point.y);
+        newCenter.transform( proj4326, proj900913 )
+        Map.container.setCenter(newCenter, 16);
+      }
+    });
+    return false;
+  })
+  
   OpenLayers.ImgPath="themes/dark/"
   $.ajax({
     url: Map.couchUrl + "_all_dbs",
@@ -132,9 +146,7 @@ $(function() {
   pdxUR.transform( proj4326, proj900913 );
   Map.options = {
     maxExtent: new OpenLayers.Bounds(pdxLL.lon,pdxLL.lat, pdxUR.lon,pdxUR.lat),    
-    restrictedExtent: new OpenLayers.Bounds(pdxLL.lon,pdxLL.lat, pdxUR.lon,pdxUR.lat),
-    numZoomLevels: 20,
-    maxResolution: 156543.0339,
+    restrictedExtent: new OpenLayers.Bounds(pdxLL.lon,pdxLL.lat, pdxUR.lon,pdxUR.lat),    
     projection: proj900913,
     displayProjection: proj4326,
     tileSize: new OpenLayers.Size(256, 256),
@@ -145,21 +157,21 @@ $(function() {
     ]
   };
   Map.container = new OpenLayers.Map('map', Map.options);
-  Map.gmap = new OpenLayers.Layer.Google("Google Streets", {"sphericalMercator": true ,numZoomLevels: 20}); 
+  Map.gmap = new OpenLayers.Layer.Google("Google Streets", {"sphericalMercator": true, MIN_ZOOM_LEVEL: 16, MAX_ZOOM_LEVEL: 21}); 
   Map.container.addLayer(Map.gmap);
 
   Map.styleMap = new OpenLayers.StyleMap({
     'default': OpenLayers.Util.applyDefaults({
       fillOpacity: 0.2, 
       strokeColor: "black", 
-      strokeWidth: 3,
+      strokeWidth: 4,
       pointRadius: 10
     }),
     'select': new OpenLayers.Style({
-      strokeColor: "yellow",
+      strokeColor: "#019DBE",
     }),
     'temporary': new OpenLayers.Style({
-      strokeColor: "blue",
+      strokeColor: "#DE027F",
     }),
   });
 
@@ -188,14 +200,15 @@ $(function() {
 
   Map.geojson_format = new OpenLayers.Format.GeoJSON();     
 
-  Map.container.setCenter(new OpenLayers.LonLat(-122.6762071,45.5234515), Map.zoom);
+  Map.container.setCenter(new OpenLayers.LonLat(-122.6762071,45.5234515));
   Map.container.events.register( 'moveend', this, function(){ Map.fetchFeatures() });
 
   if (OpenLayers.Control.MultitouchNavigation) {
     var touchControl = new OpenLayers.Control.MultitouchNavigation();
     Map.container.addControl(touchControl);
   }
-
+  
+  
   $('#databases li').live('click', function(){
     var dataset = $(this).text();
     $('.selected').removeClass('selected');
