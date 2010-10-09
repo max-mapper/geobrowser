@@ -1,6 +1,5 @@
 var GeoJSONHelper = function() {
   return {
-    // map borrowed from http://github.com/janl/mustache.js/blob/master/mustache.js
     collect_geometries : function(geometries) {
       if (geometries.type == 'GeometryCollection')
         return geometries;
@@ -27,15 +26,12 @@ var GeoJSONHelper = function() {
 var Map = function() {
   return {
     geocoder: new GClientGeocoder(),
-    couchUrl: "http://maxogden.couchone.com/",
+    couchUrl: "http://pdxapi.com/",
     currentDataset: "",
-    lon: -122.442429131298411,
-    lat: 45.546590674495434,
-    zoom: 17,
     fetchFeatures: function() {
       Indicator.show();
       $.ajax({
-        url: Map.couchUrl + Map.currentDataset + "/_design/geojson/_spatial/points",
+        url: Map.couchUrl + Map.currentDataset + "/geojson",
         dataType: 'jsonp',
         data: {
           "bbox": Map.container.getExtent().transform( proj900913, proj4326 ).toBBOX()
@@ -52,6 +48,14 @@ var Map = function() {
       $.each(data, function(key, val) {
         if (typeof(val) == 'string' && key[0] != '_') {
           out = out + '<dt>' + key + '<dd>' + val;
+        } else if (typeof(val) == 'object' && key != "geometry" && val != null) {
+          if (key == 'properties') {
+            $.each(val, function(attr, value){
+              out = out + '<dt>' + attr + '<dd>' + value;
+            })
+          } else {
+            out = out + '<dt>' + key + '<dd>' + val.join(', ');
+          }
         }
       });
       out = out + '</dl>';
@@ -75,8 +79,7 @@ var Map = function() {
     fetchDatasetMetadata: function(dataset) {
       Map.clearMetadata(dataset);
       $.ajax({
-        // TODO: Dataset metadata?
-        url: Map.couchUrl + Map.currentDataset,
+        url: Map.couchUrl + "pdxapi/" + Map.currentDataset,
         dataType: 'jsonp',
         success: function(data){
           $('#metadata').html("<h3>Dataset Metadata</h3>"+
@@ -125,23 +128,26 @@ $(function() {
   
   OpenLayers.ImgPath="themes/dark/"
   $.ajax({
-    url: Map.couchUrl + "_all_dbs",
+    url: "http://maxogden.couchone.com/_all_dbs",
     dataType: 'jsonp',
     success: function(databases){
       var dbList = $('#databases');
       $.each(databases.sort(), function(index, database){
-              if (database !== "_users" && database !== "_replicator") {
+        if (database[0] !== "_" && database !== "pdxapi") {
           dbList.append('<li>' + database + '</li>');
-              }
-              $('#databases li:first').click();
+        }
       });
+      $('#databases li:first').click();
     }
   });
 
   proj900913 = new OpenLayers.Projection("EPSG:900913"); //Spherical mercator used for google maps
   proj4326 = new OpenLayers.Projection("EPSG:4326"); 
-  var pdxLL = new OpenLayers.LonLat(-122.69256591796875,45.4947963896697);
-  var pdxUR = new OpenLayers.LonLat(-122.552490234375,45.58136746810096);
+  var lat = 45.52811798237782;
+  var lon = -122.66733169555664;
+  var fifteenMiles = 0.03;
+  var pdxLL = new OpenLayers.LonLat(lon - fifteenMiles, lat - fifteenMiles);
+  var pdxUR = new OpenLayers.LonLat(lon + fifteenMiles, lat + fifteenMiles);
   pdxLL.transform( proj4326, proj900913 );
   pdxUR.transform( proj4326, proj900913 );
   Map.options = {
@@ -157,7 +163,7 @@ $(function() {
     ]
   };
   Map.container = new OpenLayers.Map('map', Map.options);
-  Map.gmap = new OpenLayers.Layer.Google("Google Streets", {"sphericalMercator": true, MIN_ZOOM_LEVEL: 16, MAX_ZOOM_LEVEL: 21}); 
+  Map.gmap = new OpenLayers.Layer.Google("Google Streets", {"sphericalMercator": true, MIN_ZOOM_LEVEL: 14, MAX_ZOOM_LEVEL: 21}); 
   Map.container.addLayer(Map.gmap);
 
   Map.styleMap = new OpenLayers.StyleMap({
@@ -200,7 +206,7 @@ $(function() {
 
   Map.geojson_format = new OpenLayers.Format.GeoJSON();     
 
-  Map.container.setCenter(new OpenLayers.LonLat(-122.6762071,45.5234515));
+  Map.container.setCenter(new OpenLayers.LonLat(-122.6762071,45.5234515), 3);
   Map.container.events.register( 'moveend', this, function(){ Map.fetchFeatures() });
 
   if (OpenLayers.Control.MultitouchNavigation) {
@@ -213,8 +219,8 @@ $(function() {
     var dataset = $(this).text();
     $('.selected').removeClass('selected');
     $(this).addClass('selected');
-    Map.fetchDatasetMetadata(dataset);
     Map.currentDataset = dataset;
+    Map.fetchDatasetMetadata(dataset);
     Map.fetchFeatures();
   });
 });
